@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.common.exceptions import AppException, app_exception_handler, http_exception_handler
 from app.core.database import engine
 from app.modules.auth.router import router as auth_router
+from app.modules.rooms.router import router as rooms_router
 from app.modules.users.router import router as users_router
 
 
@@ -37,6 +38,7 @@ def create_app() -> FastAPI:
 
     app.include_router(auth_router)
     app.include_router(users_router)
+    app.include_router(rooms_router)
 
     return app
 
