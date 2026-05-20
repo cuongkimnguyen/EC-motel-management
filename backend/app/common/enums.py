@@ -17,6 +17,8 @@ class ContractStatus(str, Enum):
 
 class TenantStatus(str, Enum):
     DANG_THUE = "Đang thuê"
+    SAP_HET_HAN = "Sắp hết hạn"
+    NO_TIEN = "Nợ tiền"
     DA_TRA_PHONG = "Đã trả phòng"
 
 

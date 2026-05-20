@@ -11,6 +11,9 @@ from app.core.config import settings
 from app.core.database import Base, get_db
 from app.core.security import hash_password
 from app.main import app
+from app.modules.contracts.models import Contract  # noqa: F401 — ensures table is registered
+from app.modules.rooms.models import Room  # noqa: F401 — ensures table is registered
+from app.modules.tenants.models import Tenant  # noqa: F401 — ensures table is registered
 from app.modules.users.models import User  # noqa: F401 — ensures table is registered
 
 TEST_DB_URL = settings.TEST_DATABASE_URL or settings.DATABASE_URL.replace(
