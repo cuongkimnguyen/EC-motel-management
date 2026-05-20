@@ -91,7 +91,7 @@ class ExpenseRepository:
         paid = unpaid = pending = total_amount = total = 0
         for row in rows:
             total += row.cnt
-            total_amount += row.amt
+            total_amount += int(row.amt)
             if row.payment_status == "Đã thanh toán":
                 paid = row.cnt
             elif row.payment_status == "Chưa thanh toán":
