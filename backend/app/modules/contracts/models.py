@@ -7,6 +7,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.core.database import Base
 
+EXPIRY_WARNING_DAYS = 30
+
 
 class Contract(Base):
     __tablename__ = "contracts"
@@ -37,7 +39,7 @@ class Contract(Base):
         today = date.today()
         if self.end_date < today:
             return "Đã hết hạn"
-        if (self.end_date - today).days <= 30:
+        if (self.end_date - today).days <= EXPIRY_WARNING_DAYS:
             return "Sắp hết hạn"
         return "Đang hiệu lực"
 

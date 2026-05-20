@@ -245,3 +245,121 @@ async def test_delete_terminated_contract(client: AsyncClient, auth_headers: dic
 async def test_list_contracts_requires_auth(client: AsyncClient):
     resp = await client.get("/api/contracts")
     assert resp.status_code == 401
+
+
+# ---------------------------------------------------------------------------
+# Status parity tests: Python property vs SQL filter must agree
+# ---------------------------------------------------------------------------
+
+
+async def _make_contract(client, auth_headers, room_id, tenant_id, start_days, end_days):
+    resp = await client.post(
+        "/api/contracts",
+        json={
+            "room_id": room_id,
+            "tenant_id": tenant_id,
+            "start_date": future_date(start_days),
+            "end_date": future_date(end_days),
+            "monthly_rent": 3_500_000,
+            "deposit": 7_000_000,
+            "billing_cycle": 1,
+            "payment_due_day": 5,
+        },
+        headers=auth_headers,
+    )
+    return resp.json()
+
+
+async def test_status_parity_active(client: AsyncClient, auth_headers: dict):
+    """Contract with end_date far in future → 'Đang hiệu lực' in property AND SQL filter."""
+    room_id, tenant_id = await create_room_and_tenant(client, auth_headers)
+    body = await _make_contract(client, auth_headers, room_id, tenant_id, 0, 100)
+    assert body["status"] == "Đang hiệu lực"
+
+    resp = await client.get("/api/contracts?status=Đang+hiệu+lực", headers=auth_headers)
+    ids = [c["id"] for c in resp.json()["data"]]
+    assert body["id"] in ids
+
+    resp2 = await client.get("/api/contracts?status=Sắp+hết+hạn", headers=auth_headers)
+    ids2 = [c["id"] for c in resp2.json()["data"]]
+    assert body["id"] not in ids2
+
+
+async def test_status_parity_expiring_soon(client: AsyncClient, auth_headers: dict):
+    """Contract with end_date ≤ 30 days → 'Sắp hết hạn' in property AND SQL filter."""
+    room_id, tenant_id = await create_room_and_tenant(client, auth_headers)
+    body = await _make_contract(client, auth_headers, room_id, tenant_id, 0, 15)
+    assert body["status"] == "Sắp hết hạn"
+
+    resp = await client.get("/api/contracts?status=Sắp+hết+hạn", headers=auth_headers)
+    ids = [c["id"] for c in resp.json()["data"]]
+    assert body["id"] in ids
+
+    resp2 = await client.get("/api/contracts?status=Đang+hiệu+lực", headers=auth_headers)
+    ids2 = [c["id"] for c in resp2.json()["data"]]
+    assert body["id"] not in ids2
+
+
+async def test_status_parity_terminated(client: AsyncClient, auth_headers: dict):
+    """Terminated contract → 'Đã chấm dứt' in property AND SQL filter."""
+    room_id, tenant_id = await create_room_and_tenant(client, auth_headers)
+    body = await _make_contract(client, auth_headers, room_id, tenant_id, 0, 100)
+    contract_id = body["id"]
+
+    term_resp = await client.post(
+        f"/api/contracts/{contract_id}/terminate",
+        json={"termination_date": future_date(1)},
+        headers=auth_headers,
+    )
+    assert term_resp.json()["status"] == "Đã chấm dứt"
+
+    resp = await client.get("/api/contracts?status=Đã+chấm+dứt", headers=auth_headers)
+    ids = [c["id"] for c in resp.json()["data"]]
+    assert contract_id in ids
+
+    resp2 = await client.get("/api/contracts?status=Đang+hiệu+lực", headers=auth_headers)
+    ids2 = [c["id"] for c in resp2.json()["data"]]
+    assert contract_id not in ids2
+
+
+# ---------------------------------------------------------------------------
+# Tenant side-effect tests for renewal
+# ---------------------------------------------------------------------------
+
+
+async def test_renew_contract_keeps_tenant_linked(client: AsyncClient, auth_headers: dict):
+    """After renewal, tenant stays linked to same room and status is recalculated."""
+    room_id, tenant_id = await create_room_and_tenant(client, auth_headers)
+    # Create contract expiring soon (15 days) → tenant.status = "Sắp hết hạn"
+    body = await _make_contract(client, auth_headers, room_id, tenant_id, 0, 15)
+    contract_id = body["id"]
+
+    tenant_resp = await client.get("/api/tenants", headers=auth_headers)
+    our_tenant = next(t for t in tenant_resp.json()["data"] if t["id"] == tenant_id)
+    assert our_tenant["status"] == "Sắp hết hạn"
+
+    # Renew with new end_date far in future → tenant.status should become "Đang thuê"
+    renew_resp = await client.post(
+        f"/api/contracts/{contract_id}/renew",
+        json={
+            "new_start_date": future_date(16),
+            "new_end_date": future_date(365),
+            "monthly_rent": 3_500_000,
+            "deposit": 7_000_000,
+            "billing_cycle": 1,
+            "payment_due_day": 5,
+        },
+        headers=auth_headers,
+    )
+    assert renew_resp.status_code == 200
+
+    # Tenant must still be linked to the room
+    tenant_resp2 = await client.get("/api/tenants", headers=auth_headers)
+    our_tenant2 = next(t for t in tenant_resp2.json()["data"] if t["id"] == tenant_id)
+    assert our_tenant2["current_room_id"] == room_id
+    assert our_tenant2["status"] == "Đang thuê"
+
+    # Room must still be occupied
+    room_resp = await client.get("/api/rooms", headers=auth_headers)
+    our_room = next(r for r in room_resp.json()["data"] if r["id"] == room_id)
+    assert our_room["status"] == "Đang thuê"

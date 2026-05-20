@@ -142,6 +142,12 @@ class ContractService:
         if contract.status != "Đã hết hạn":
             await self.repo.update(contract, terminated_at=contract.end_date)
 
+        # Recompute tenant status based on the new contract
+        tenant = await self.tenant_repo.get_by_id(contract.tenant_id)
+        if tenant:
+            tenant_status = await self._compute_tenant_status(tenant.id)
+            await self.tenant_repo.update(tenant, current_room_id=contract.room_id, status=tenant_status)
+
         return {
             "old_contract": await self._to_response(contract),
             "new_contract": await self._to_response(new_contract),

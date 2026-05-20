@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.modules.contracts.models import Contract
+from app.modules.contracts.models import EXPIRY_WARNING_DAYS, Contract
 
 
 class ContractRepository:
@@ -63,7 +63,7 @@ class ContractRepository:
         status: str | None = None,
     ) -> tuple[list[Contract], int]:
         today = date.today()
-        thirty_days = today + timedelta(days=30)
+        thirty_days = today + timedelta(days=EXPIRY_WARNING_DAYS)
 
         q = select(Contract)
         if search:

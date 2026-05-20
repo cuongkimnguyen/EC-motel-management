@@ -71,7 +71,12 @@ class RoomRepository:
         return list(result.scalars().all()), total
 
     async def count_active_contracts(self, room_id: uuid.UUID) -> int:
-        """Count non-terminated, non-expired contracts for a room."""
+        """Count non-terminated, non-expired contracts for a room.
+
+        NOTE: Called once per room in list_rooms → current_tenants. This is an N+1
+        query pattern. Acceptable for < ~200 rooms. If room count exceeds that
+        threshold, replace with a single JOIN/subquery on the list query itself.
+        """
         from app.modules.contracts.models import Contract
 
         today = date.today()
