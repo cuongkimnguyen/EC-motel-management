@@ -10,6 +10,7 @@ from app.modules.auth.router import router as auth_router
 from app.modules.contracts.router import router as contracts_router
 from app.modules.rooms.router import router as rooms_router
 from app.modules.tenants.router import router as tenants_router
+from app.modules.expenses.router import router as expenses_router
 from app.modules.users.router import router as users_router
 
 
@@ -43,6 +44,7 @@ def create_app() -> FastAPI:
     app.include_router(rooms_router)
     app.include_router(tenants_router)
     app.include_router(contracts_router)
+    app.include_router(expenses_router)
 
     return app
 
