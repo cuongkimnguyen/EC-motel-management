@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 
-from sqlalchemy import delete, func, select, update
+from sqlalchemy import and_, delete, func, or_, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -49,6 +49,7 @@ class NotificationRepository:
             )
         )
         await self.db.execute(stmt)
+        await self.db.flush()
 
     async def delete_stale(self, valid_keys: list[tuple[str, str]]) -> None:
         """Delete auto-generated notifications whose source condition no longer holds."""
@@ -57,12 +58,11 @@ class NotificationRepository:
             await self.db.execute(
                 delete(Notification).where(Notification.type.in_(auto_types))
             )
+            await self.db.flush()
             return
 
         # Delete auto-generated notifications NOT in the valid set
         # Build the condition: type IN auto_types AND (type, reference_id) NOT IN valid_keys
-        from sqlalchemy import and_, or_
-
         valid_conditions = or_(
             *[
                 and_(Notification.type == t, Notification.reference_id == r)
@@ -75,6 +75,7 @@ class NotificationRepository:
                 ~valid_conditions,
             )
         )
+        await self.db.flush()
 
     async def mark_read(self, notif_id: str | uuid.UUID) -> Notification | None:
         notif = await self.get_by_id(notif_id)
