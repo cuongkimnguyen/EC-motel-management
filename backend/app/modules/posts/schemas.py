@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 VALID_POST_TYPES = ("Tuyển khách", "Khuyến mãi", "Thông báo")
 VALID_CHANNELS = ("Facebook Page", "Facebook Group", "Zalo")
@@ -21,13 +21,15 @@ class PostCreate(BaseModel):
     assignee: str | None = None
     thumbnail: str | None = None
 
-    def model_post_init(self, __context):
+    @model_validator(mode="after")
+    def validate_post_fields(self) -> "PostCreate":
         if self.post_type not in VALID_POST_TYPES:
             raise ValueError(f"post_type phải là một trong: {VALID_POST_TYPES}")
         if self.channel not in VALID_CHANNELS:
             raise ValueError(f"channel phải là một trong: {VALID_CHANNELS}")
         if self.post_type in ROOM_FREE_TYPES and self.room_id is not None:
             raise ValueError(f"Bài đăng loại {self.post_type} không được gắn phòng")
+        return self
 
 
 class PostUpdate(BaseModel):
