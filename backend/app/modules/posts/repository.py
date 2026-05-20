@@ -62,7 +62,12 @@ class PostRepository:
         if post_type:
             q = q.where(Post.post_type == post_type)
         if room_id:
-            q = q.where(Post.room_id == room_id)
+            import uuid as _uuid
+            try:
+                q = q.where(Post.room_id == _uuid.UUID(room_id))
+            except ValueError:
+                # Invalid UUID string — return no results
+                q = q.where(Post.id == None)  # noqa: E711
 
         count_q = select(func.count()).select_from(q.subquery())
         total = await self.db.scalar(count_q) or 0

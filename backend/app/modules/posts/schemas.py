@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 VALID_POST_TYPES = ("Tuyển khách", "Khuyến mãi", "Thông báo")
 VALID_CHANNELS = ("Facebook Page", "Facebook Group", "Zalo")
@@ -44,9 +44,26 @@ class PostUpdate(BaseModel):
     assignee: str | None = None
     thumbnail: str | None = None
 
+    @model_validator(mode="after")
+    def validate_channel(self) -> "PostUpdate":
+        if self.channel is not None and self.channel not in VALID_CHANNELS:
+            raise ValueError(f"channel phải là một trong: {VALID_CHANNELS}")
+        return self
+
 
 class PostSchedule(BaseModel):
     scheduled_at: datetime
+
+    @field_validator("scheduled_at")
+    @classmethod
+    def must_be_future(cls, v: datetime) -> datetime:
+        now = datetime.now(timezone.utc)
+        # Make v timezone-aware if it isn't
+        if v.tzinfo is None:
+            v = v.replace(tzinfo=timezone.utc)
+        if v <= now:
+            raise ValueError("scheduled_at phải là thời điểm trong tương lai")
+        return v
 
 
 class PostResponse(BaseModel):
