@@ -12,6 +12,9 @@ from app.core.database import Base, get_db
 from app.core.security import hash_password
 from app.main import app
 from app.modules.contracts.models import Contract  # noqa: F401 — ensures table is registered
+from app.modules.expenses.models import Expense  # noqa: F401
+from app.modules.notifications.models import Notification  # noqa: F401 — ensures table is registered
+from app.modules.posts.models import Post  # noqa: F401
 from app.modules.rooms.models import Room  # noqa: F401 — ensures table is registered
 from app.modules.tenants.models import Tenant  # noqa: F401 — ensures table is registered
 from app.modules.users.models import User  # noqa: F401 — ensures table is registered
@@ -52,6 +55,17 @@ def setup_database():
     asyncio.run(_create())
     yield
     asyncio.run(_drop())
+
+
+@pytest.fixture(autouse=True)
+def reset_notification_refresh_ttl():
+    """Reset the in-process notification refresh timestamp before each test.
+
+    Without this, the 5-minute TTL throttle would prevent _refresh() from
+    running between tests that create new data and immediately read notifications.
+    """
+    import app.modules.notifications.service as notif_service
+    notif_service._last_refresh_at = None
 
 
 @pytest.fixture(autouse=True)
