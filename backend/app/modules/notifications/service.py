@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -10,6 +10,10 @@ from app.modules.notifications.repository import NotificationRepository
 from app.modules.notifications.schemas import NotificationCount, NotificationResponse
 from app.modules.rooms.models import Room
 
+# Throttle: skip refresh if last run was within this many seconds (per process).
+_REFRESH_TTL_SECONDS: int = 300
+_last_refresh_at: datetime | None = None
+
 
 class NotificationService:
     def __init__(self, db: AsyncSession):
@@ -17,7 +21,17 @@ class NotificationService:
         self.repo = NotificationRepository(db)
 
     async def _refresh(self) -> None:
-        """Scan contracts and rooms; upsert active notifications; delete stale ones."""
+        """Scan contracts and rooms; upsert active notifications; delete stale ones.
+
+        Throttled to at most once per _REFRESH_TTL_SECONDS to avoid write
+        side-effects on every read request.
+        """
+        global _last_refresh_at
+        now = datetime.now(timezone.utc)
+        if _last_refresh_at is not None and (now - _last_refresh_at).total_seconds() < _REFRESH_TTL_SECONDS:
+            return
+        _last_refresh_at = now
+
         today = date.today()
         warning_date = today + timedelta(days=EXPIRY_WARNING_DAYS)
         active_keys: list[tuple[str, str]] = []

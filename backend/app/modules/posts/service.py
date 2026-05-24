@@ -40,7 +40,15 @@ class PostService:
 
     async def list_posts(self, params: PaginationParams, **filters) -> dict:
         posts, total = await self.repo.list_posts(params.page, params.limit, **filters)
-        data = [await self._to_response(p) for p in posts]
+        # Batch-load all referenced rooms in one query to avoid N+1.
+        room_ids = list({p.room_id for p in posts if p.room_id})
+        room_map = await self.room_repo.get_by_ids(room_ids)
+        data = []
+        for p in posts:
+            resp = PostResponse.model_validate(p)
+            if p.room_id and p.room_id in room_map:
+                resp.room_code = room_map[p.room_id].code
+            data.append(resp)
         return make_paginated_response(data, total, params)
 
     async def get_stats(self) -> PostStats:

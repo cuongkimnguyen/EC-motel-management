@@ -19,6 +19,13 @@ class RoomRepository:
         result = await self.db.execute(select(Room).where(Room.code == code))
         return result.scalar_one_or_none()
 
+    async def get_by_ids(self, room_ids: list[uuid.UUID]) -> dict[uuid.UUID, "Room"]:
+        """Batch-fetch rooms by a list of IDs. Returns a dict keyed by room ID."""
+        if not room_ids:
+            return {}
+        result = await self.db.execute(select(Room).where(Room.id.in_(room_ids)))
+        return {r.id: r for r in result.scalars().all()}
+
     async def create(self, **kwargs) -> Room:
         room = Room(**kwargs)
         self.db.add(room)

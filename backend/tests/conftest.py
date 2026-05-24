@@ -58,6 +58,17 @@ def setup_database():
 
 
 @pytest.fixture(autouse=True)
+def reset_notification_refresh_ttl():
+    """Reset the in-process notification refresh timestamp before each test.
+
+    Without this, the 5-minute TTL throttle would prevent _refresh() from
+    running between tests that create new data and immediately read notifications.
+    """
+    import app.modules.notifications.service as notif_service
+    notif_service._last_refresh_at = None
+
+
+@pytest.fixture(autouse=True)
 def clean_tables():
     """Delete all rows after each test via a fresh engine + asyncio.run().
 
