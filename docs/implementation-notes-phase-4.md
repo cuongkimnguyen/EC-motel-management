@@ -67,3 +67,23 @@
 **Decision:** For each past month: `new_debt` = monthly_rent sum from contracts active that month (approximation of rent due), `collected` = `new_debt` (assuming all was collected for past months), `total_debt` = 0 for past months / current total for latest month. This gives a chart that shows "all collected, small residual debt now" which is a reasonable visual for a healthy motel.
 
 ---
+
+### 7. SQLAlchemy join ambiguity on aggregate queries with building filter
+
+**What happened:** Queries like `select(func.sum(Contract.monthly_rent))` start from Contract. When adding `.join(Room, ...)` for the building filter, SQLAlchemy raised `InvalidRequestError: Don't know how to join to Room`.
+
+**Fix:** Added `.select_from(Contract)` to every scalar aggregate query that conditionally joins Room. This pins the FROM clause regardless of whether the join is applied.
+
+**Affected:** `get_revenue_for_period`, `get_active_contract_count`.
+
+---
+
+### 8. Tests use dynamic `date.today()` for contract dates, not hardcoded 2025
+
+**What happened:** Tests used `end="2025-12-31"` — already in the past. `get_active_contract_count` filters `end_date >= today`, so count returned 0.
+
+**Fix:** `make_contract` default `end` = `date.today() + 365 days`. Tests that check `active_contracts` now use the current month/year as the report period, not July 2025.
+
+**Note:** Expense-only tests (quarter/year period) still use 2025 dates because expense queries filter by `expense_date`, which is independent of contract currency.
+
+---
