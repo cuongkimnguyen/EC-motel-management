@@ -87,3 +87,57 @@
 **Note:** Expense-only tests (quarter/year period) still use 2025 dates because expense queries filter by `expense_date`, which is independent of contract currency.
 
 ---
+
+## Module B — Dashboard + Activity Log
+
+### 9. DashboardService reuses ReportsRepository for month financials
+
+**Spec said:** `current_month_revenue`, `current_month_expenses`.
+
+**Decision:** Rather than duplicating the aggregation SQL that already lives in `ReportsRepository`, `DashboardService` instantiates `ReportsRepository` and calls `get_revenue_for_period` / `get_expense_for_period` with `month_start`/`month_end`. This avoids drift between the two modules' numbers.
+
+**Tradeoff:** DashboardService now depends on ReportsRepository (cross-module dependency). Acceptable because Dashboard is a read-only aggregation layer and the dependency is one-way.
+
+---
+
+### 10. ActivityService swallows all exceptions silently
+
+**Spec said:** Activity log is a cross-cutting concern.
+
+**Decision:** `ActivityService.log_event()` wraps the insert in `try/except Exception: pass`. Failures in activity logging will never propagate to the API caller and won't roll back the main transaction.
+
+**Why:** Activity logs are observability-only. If the `activity_log` table is unavailable or the insert fails for any reason, the main business operation (e.g. creating a contract) must still succeed.
+
+**Tradeoff:** Silent failures mean activity gaps won't be noticed immediately. If log completeness is ever required (audit trail), this exception handling must be removed and the insert must be part of the main transaction.
+
+---
+
+### 11. Activity events wired at service layer, not router layer
+
+**Decision:** `log_event()` is called from within each module's Service method (rooms, tenants, contracts, expenses), not from the router. This ensures events are logged regardless of how the service is called (direct call from another service or via HTTP).
+
+**What's logged:** `room_created`, `room_deleted`, `tenant_created`, `tenant_deleted`, `contract_created`, `contract_renewed`, `contract_terminated`, `expense_created`.
+
+**What's NOT logged:** Read operations (list, get), update operations (minor field changes), status-only updates (e.g. `update_status`). Rationale: activity feed is for significant events, not every field edit.
+
+---
+
+### 12. `GET /api/dashboard/activity` returns `{ "data": [...] }` envelope, not bare array
+
+**Spec said:** Activity feed returns a list.
+
+**Decision:** Response uses `{ "data": [...] }` wrapper to be consistent with paginated list responses elsewhere in the API (even though activity is not paginated). The frontend mock also uses a `data` key.
+
+---
+
+### 13. ActivityLog model uses `server_default` for `created_at`, no Python `default`
+
+**Decision:** `created_at` uses `server_default=text("now()")` so the DB sets the timestamp atomically. No Python-side `default=datetime.utcnow` to avoid clock skew in multi-process deployments.
+
+---
+
+### 14. `vacant_without_post` query uses Room table directly, no join to posts
+
+**Decision:** `DashboardService.get_stats()` queries `Room.status == "Trống" AND Room.has_active_post IS FALSE` directly on the Room table. The `has_active_post` column is maintained by the Posts module as a denormalized flag, so no join to the `posts` table is needed.
+
+---

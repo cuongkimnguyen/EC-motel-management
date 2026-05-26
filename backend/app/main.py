@@ -13,6 +13,7 @@ from app.modules.tenants.router import router as tenants_router
 from app.modules.expenses.router import router as expenses_router
 from app.modules.notifications.router import router as notifications_router
 from app.modules.posts.router import router as posts_router
+from app.modules.dashboard.router import router as dashboard_router
 from app.modules.reports.router import router as reports_router
 from app.modules.users.router import router as users_router
 
@@ -51,6 +52,7 @@ def create_app() -> FastAPI:
     app.include_router(posts_router)
     app.include_router(notifications_router)
     app.include_router(reports_router)
+    app.include_router(dashboard_router)
 
     return app
 
