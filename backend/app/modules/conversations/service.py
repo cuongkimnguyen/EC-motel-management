@@ -72,23 +72,28 @@ class ConversationService:
             messaging_type = "MESSAGE_TAG"
             tag = "HUMAN_AGENT"
 
+        # Gate outbound send on token presence — FACEBOOK_WEBHOOK_ENABLED controls inbound only.
+        if not settings.FACEBOOK_PAGE_ACCESS_TOKEN:
+            raise HTTPException(
+                status_code=503,
+                detail="Meta Send API chưa được cấu hình (FACEBOOK_PAGE_ACCESS_TOKEN còn trống)",
+            )
+
         meta_mid: str | None = None
         error_detail: str | None = None
         status = "sent"
-
-        if settings.FACEBOOK_WEBHOOK_ENABLED:
-            try:
-                meta_mid = await meta_send_api.send_message(
-                    psid=conv.psid,
-                    text=text,
-                    page_access_token=settings.FACEBOOK_PAGE_ACCESS_TOKEN,
-                    graph_api_version=settings.META_GRAPH_API_VERSION,
-                    messaging_type=messaging_type,
-                    tag=tag,
-                )
-            except (httpx.HTTPStatusError, httpx.TransportError) as exc:
-                error_detail = str(exc)
-                status = "failed"
+        try:
+            meta_mid = await meta_send_api.send_message(
+                psid=conv.psid,
+                text=text,
+                page_access_token=settings.FACEBOOK_PAGE_ACCESS_TOKEN,
+                graph_api_version=settings.META_GRAPH_API_VERSION,
+                messaging_type=messaging_type,
+                tag=tag,
+            )
+        except (httpx.HTTPStatusError, httpx.TransportError) as exc:
+            error_detail = str(exc)
+            status = "failed"
 
         sent_at = datetime.now(tz=timezone.utc)
         msg = await self.repo.insert_message(

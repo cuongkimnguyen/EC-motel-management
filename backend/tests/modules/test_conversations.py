@@ -193,8 +193,8 @@ async def test_send_message_success(
         return "mid.mock123"
 
     monkeypatch.setattr("app.modules.conversations.service.meta_send_api.send_message", mock_send)
-    # Enable webhook so service actually calls mock_send
-    monkeypatch.setattr("app.modules.conversations.service.settings.FACEBOOK_WEBHOOK_ENABLED", True)
+    # Provide a token so service actually calls mock_send (token presence gates outbound send)
+    monkeypatch.setattr("app.modules.conversations.service.settings.FACEBOOK_PAGE_ACCESS_TOKEN", "test_token")
 
     r = await client.post(
         f"/api/conversations/{conv.id}/messages",
@@ -227,7 +227,7 @@ async def test_send_message_uses_human_agent_tag_when_window_expired(
         return "mid.mock456"
 
     monkeypatch.setattr("app.modules.conversations.service.meta_send_api.send_message", mock_send)
-    monkeypatch.setattr("app.modules.conversations.service.settings.FACEBOOK_WEBHOOK_ENABLED", True)
+    monkeypatch.setattr("app.modules.conversations.service.settings.FACEBOOK_PAGE_ACCESS_TOKEN", "test_token")
 
     r = await client.post(
         f"/api/conversations/{conv.id}/messages",
@@ -256,7 +256,7 @@ async def test_send_message_failed_returns_502(
         raise _httpx.HTTPStatusError("server error", request=request, response=response)
 
     monkeypatch.setattr("app.modules.conversations.service.meta_send_api.send_message", mock_send_fail)
-    monkeypatch.setattr("app.modules.conversations.service.settings.FACEBOOK_WEBHOOK_ENABLED", True)
+    monkeypatch.setattr("app.modules.conversations.service.settings.FACEBOOK_PAGE_ACCESS_TOKEN", "test_token")
 
     r = await client.post(
         f"/api/conversations/{conv.id}/messages",

@@ -63,7 +63,9 @@ class ConversationRepository:
         await self.db.refresh(msg)
         return msg
 
-    async def message_exists_by_mid(self, meta_mid: str) -> bool:
+    async def message_exists_by_mid(self, meta_mid: str | None) -> bool:
+        if not meta_mid:
+            return False
         result = await self.db.execute(
             select(ChatMessage.id).where(ChatMessage.meta_mid == meta_mid)
         )

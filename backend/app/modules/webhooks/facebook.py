@@ -3,6 +3,10 @@
 GET  /api/webhooks/facebook  — webhook verification (Meta calls this once on setup)
 POST /api/webhooks/facebook  — inbound message events
 
+Security model:
+    FACEBOOK_WEBHOOK_ENABLED=True  → endpoint is live; HMAC signature required on every POST.
+    FACEBOOK_WEBHOOK_ENABLED=False → both GET and POST return 404 (webhook is off).
+
 Background task note:
     FastAPI BackgroundTasks run after the response is sent; at that point the
     request-scoped DB session is closed. The background task opens its own session
@@ -12,6 +16,7 @@ Background task note:
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
 
 from app.core.config import settings
 from app.core.database import AsyncSessionLocal
@@ -41,8 +46,13 @@ async def _process_webhook_body(body: dict) -> None:
                     if msg.get("is_echo"):
                         continue
 
+                    mid = msg.get("mid")
+                    if not mid:
+                        # Meta always provides mid on real message events.
+                        # Skip events without mid — can't deduplicate or store safely.
+                        continue
+
                     psid = event["sender"]["id"]
-                    mid = msg.get("mid", "")
                     text = msg.get("text")
                     ts = event.get("timestamp", 0)
                     sent_at = datetime.fromtimestamp(ts / 1000, tz=timezone.utc)
@@ -56,27 +66,38 @@ async def _process_webhook_body(body: dict) -> None:
                     )
 
 
-@router.get("/facebook")
+@router.get("/facebook", response_class=PlainTextResponse)
 async def verify_webhook(
     hub_mode: str = Query(alias="hub.mode", default=""),
     hub_verify_token: str = Query(alias="hub.verify_token", default=""),
     hub_challenge: str = Query(alias="hub.challenge", default=""),
 ):
-    """Meta webhook verification handshake."""
+    """Meta webhook verification handshake.
+
+    Returns the raw hub.challenge string as plain text — Meta requires exact echo.
+    Only reachable when FACEBOOK_WEBHOOK_ENABLED=True.
+    """
+    if not settings.FACEBOOK_WEBHOOK_ENABLED:
+        raise HTTPException(status_code=404)
     if hub_mode == "subscribe" and hub_verify_token == settings.FACEBOOK_VERIFY_TOKEN:
-        return int(hub_challenge) if hub_challenge.isdigit() else hub_challenge
+        return PlainTextResponse(hub_challenge)
     raise HTTPException(status_code=403, detail="Verification failed")
 
 
 @router.post("/facebook")
 async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
-    """Receive inbound Facebook Messenger events."""
-    raw_body = await request.body()
+    """Receive inbound Facebook Messenger events.
 
-    if settings.FACEBOOK_WEBHOOK_ENABLED:
-        sig_header = request.headers.get("X-Hub-Signature-256", "")
-        if not verify_x_hub_signature_256(raw_body, sig_header, settings.FACEBOOK_APP_SECRET):
-            raise HTTPException(status_code=403, detail="Invalid signature")
+    When FACEBOOK_WEBHOOK_ENABLED=False, returns 404 (endpoint is off).
+    When enabled, HMAC-SHA256 signature is always verified before processing.
+    """
+    if not settings.FACEBOOK_WEBHOOK_ENABLED:
+        raise HTTPException(status_code=404)
+
+    raw_body = await request.body()
+    sig_header = request.headers.get("X-Hub-Signature-256", "")
+    if not verify_x_hub_signature_256(raw_body, sig_header, settings.FACEBOOK_APP_SECRET):
+        raise HTTPException(status_code=403, detail="Invalid signature")
 
     body = await request.json()
     background_tasks.add_task(_process_webhook_body, body)
