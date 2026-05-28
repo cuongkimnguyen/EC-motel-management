@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -6,8 +7,8 @@ from pydantic import BaseModel, ConfigDict, Field
 class ChatMessageResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
-    conversation_id: str
+    id: uuid.UUID
+    conversation_id: uuid.UUID
     meta_mid: str | None = None
     direction: str
     message_type: str
@@ -24,7 +25,7 @@ class ChatMessageResponse(BaseModel):
 class ChatConversationSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: uuid.UUID
     psid: str
     page_id: str
     customer_name: str | None = None
@@ -42,7 +43,7 @@ class ChatConversationSummary(BaseModel):
 class ChatConversationDetail(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: uuid.UUID
     psid: str
     page_id: str
     customer_name: str | None = None

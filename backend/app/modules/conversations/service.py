@@ -106,10 +106,7 @@ class ConversationService:
         if status == "failed":
             raise HTTPException(
                 status_code=502,
-                detail={
-                    "message": "Gửi tin nhắn thất bại",
-                    "stored": ChatMessageResponse.model_validate(msg).model_dump(mode="json"),
-                },
+                detail={"message": "Gửi tin nhắn thất bại", "error": error_detail or ""},
             )
 
         return ChatMessageResponse.model_validate(msg)
