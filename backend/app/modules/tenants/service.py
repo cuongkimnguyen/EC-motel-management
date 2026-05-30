@@ -2,6 +2,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.pagination import PaginationParams, make_paginated_response
+from app.modules.activity.service import ActivityService
 from app.modules.tenants.repository import TenantRepository
 from app.modules.tenants.schemas import TenantCreate, TenantResponse, TenantUpdate
 
@@ -9,6 +10,7 @@ from app.modules.tenants.schemas import TenantCreate, TenantResponse, TenantUpda
 class TenantService:
     def __init__(self, db: AsyncSession):
         self.repo = TenantRepository(db)
+        self.activity = ActivityService(db)
 
     async def _to_response(self, tenant) -> TenantResponse:
         resp = TenantResponse.model_validate(tenant)
@@ -30,6 +32,13 @@ class TenantService:
         if await self.repo.get_by_cccd(payload.cccd):
             raise HTTPException(status_code=409, detail="Số CCCD đã tồn tại")
         tenant = await self.repo.create(**payload.model_dump())
+        await self.activity.log_event(
+            event_type="tenant_created",
+            description=f"Thêm khách thuê mới: {tenant.full_name}",
+            module="tenants",
+            reference_id=tenant.id,
+            reference_type="tenant",
+        )
         return await self._to_response(tenant)
 
     async def update_tenant(self, tenant_id: str, payload: TenantUpdate) -> TenantResponse:
@@ -51,4 +60,11 @@ class TenantService:
             raise HTTPException(
                 status_code=409, detail="Không thể xóa khách thuê đang có hợp đồng"
             )
+        await self.activity.log_event(
+            event_type="tenant_deleted",
+            description=f"Xóa khách thuê: {tenant.full_name}",
+            module="tenants",
+            reference_id=tenant.id,
+            reference_type="tenant",
+        )
         await self.repo.delete(tenant)

@@ -13,7 +13,9 @@ from app.core.security import hash_password
 from app.main import app
 from app.modules.contracts.models import Contract  # noqa: F401 — ensures table is registered
 from app.modules.expenses.models import Expense  # noqa: F401
+from app.modules.activity.models import ActivityLog  # noqa: F401 — ensures table is registered
 from app.modules.notifications.models import Notification  # noqa: F401 — ensures table is registered
+from app.modules.conversations.models import ChatConversation, ChatMessage  # noqa: F401
 from app.modules.posts.models import Post  # noqa: F401
 from app.modules.rooms.models import Room  # noqa: F401 — ensures table is registered
 from app.modules.tenants.models import Tenant  # noqa: F401 — ensures table is registered
@@ -55,6 +57,25 @@ def setup_database():
     asyncio.run(_create())
     yield
     asyncio.run(_drop())
+
+
+@pytest.fixture(autouse=True)
+def patch_webhook_db_factory():
+    """Patch the module-level _db_factory in webhooks/facebook.py to use TestSessionLocal.
+
+    The Facebook webhook background task opens its own DB session via _db_factory
+    because the request-scoped session is closed before the task runs.
+    This fixture replaces the production AsyncSessionLocal with TestSessionLocal.
+    facebook.py is imported lazily (only after Task 8 creates it), so guard with try/except.
+    """
+    try:
+        import app.modules.webhooks.facebook as fb_module
+        original = fb_module._db_factory
+        fb_module._db_factory = TestSessionLocal
+        yield
+        fb_module._db_factory = original
+    except ImportError:
+        yield
 
 
 @pytest.fixture(autouse=True)

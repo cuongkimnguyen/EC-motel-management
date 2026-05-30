@@ -23,8 +23,24 @@ class NotificationRepository:
         title: str,
         message: str,
         priority: str,
+        reset_read: bool = False,
     ) -> None:
-        """Insert or update notification by (type, reference_id). Preserves read state."""
+        """Insert or update notification by (type, reference_id).
+
+        Args:
+            reset_read: If True, forces read=False on conflict (e.g. new inbound message
+                        re-alerts admin even if they read a prior notification for this conv).
+                        If False (default), preserves existing read state (contract_expiry, etc).
+        """
+        conflict_set: dict = {
+            "title": title,
+            "message": message,
+            "date": date.today(),
+            "priority": priority,
+        }
+        if reset_read:
+            conflict_set["read"] = False
+
         stmt = (
             insert(Notification)
             .values(
@@ -39,13 +55,7 @@ class NotificationRepository:
             )
             .on_conflict_do_update(
                 constraint="uq_notification_type_ref",
-                set_={
-                    "title": title,
-                    "message": message,
-                    "date": date.today(),
-                    "priority": priority,
-                    # NOTE: `read` is intentionally NOT updated — preserve user's read state
-                },
+                set_=conflict_set,
             )
         )
         await self.db.execute(stmt)

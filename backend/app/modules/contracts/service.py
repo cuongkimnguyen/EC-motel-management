@@ -15,6 +15,7 @@ from app.modules.contracts.schemas import (
     ContractTerminate,
     ContractUpdate,
 )
+from app.modules.activity.service import ActivityService
 from app.modules.rooms.repository import RoomRepository
 from app.modules.tenants.repository import TenantRepository
 
@@ -25,6 +26,7 @@ class ContractService:
         self.repo = ContractRepository(db)
         self.room_repo = RoomRepository(db)
         self.tenant_repo = TenantRepository(db)
+        self.activity = ActivityService(db)
 
     async def _generate_code(self) -> str:
         year = date.today().year
@@ -101,6 +103,13 @@ class ContractService:
         tenant_status = await self._compute_tenant_status(tenant.id)
         await self.tenant_repo.update(tenant, current_room_id=room.id, status=tenant_status)
 
+        await self.activity.log_event(
+            event_type="contract_created",
+            description=f"Tạo hợp đồng mới: {contract.code} - {tenant.full_name} - {room.code}",
+            module="contracts",
+            reference_id=contract.id,
+            reference_type="contract",
+        )
         return await self._to_response(contract)
 
     async def update_contract(self, contract_id: str, payload: ContractUpdate) -> ContractResponse:
@@ -148,6 +157,13 @@ class ContractService:
             tenant_status = await self._compute_tenant_status(tenant.id)
             await self.tenant_repo.update(tenant, current_room_id=contract.room_id, status=tenant_status)
 
+        await self.activity.log_event(
+            event_type="contract_renewed",
+            description=f"Gia hạn hợp đồng: {contract.code} → {new_contract.code}",
+            module="contracts",
+            reference_id=new_contract.id,
+            reference_type="contract",
+        )
         return {
             "old_contract": await self._to_response(contract),
             "new_contract": await self._to_response(new_contract),
@@ -172,6 +188,13 @@ class ContractService:
         if tenant:
             await self.tenant_repo.update(tenant, current_room_id=None, status="Đã trả phòng")
 
+        await self.activity.log_event(
+            event_type="contract_terminated",
+            description=f"Chấm dứt hợp đồng: {contract.code}",
+            module="contracts",
+            reference_id=contract.id,
+            reference_type="contract",
+        )
         return await self._to_response(contract)
 
     async def delete_contract(self, contract_id: str) -> None:

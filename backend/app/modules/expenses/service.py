@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.pagination import PaginationParams, make_paginated_response
+from app.modules.activity.service import ActivityService
 from app.modules.expenses.repository import ExpenseRepository
 from app.modules.expenses.schemas import ExpenseCreate, ExpenseResponse, ExpenseStats, ExpenseUpdate
 
@@ -11,6 +12,7 @@ from app.modules.expenses.schemas import ExpenseCreate, ExpenseResponse, Expense
 class ExpenseService:
     def __init__(self, db: AsyncSession):
         self.repo = ExpenseRepository(db)
+        self.activity = ActivityService(db)
 
     async def _generate_code(self) -> str:
         year = date.today().year
@@ -39,6 +41,13 @@ class ExpenseService:
     async def create_expense(self, payload: ExpenseCreate) -> ExpenseResponse:
         code = await self._generate_code()
         expense = await self.repo.create(code=code, **payload.model_dump())
+        await self.activity.log_event(
+            event_type="expense_created",
+            description=f"Thêm chi phí: {expense.code} - {expense.title} ({expense.amount:,}đ)",
+            module="expenses",
+            reference_id=expense.id,
+            reference_type="expense",
+        )
         return ExpenseResponse.model_validate(expense)
 
     async def update_expense(self, expense_id: str, payload: ExpenseUpdate) -> ExpenseResponse:
