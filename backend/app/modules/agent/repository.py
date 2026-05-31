@@ -15,10 +15,19 @@ class AgentRepository:
         return msg
 
     async def get_history(self, session_id: str, limit: int = 10) -> list[AgentConversation]:
+        """Return the latest `limit` messages in chronological order.
+
+        Query descending to get the N most recent, then reverse so the
+        result is oldest-first (natural conversation order for LLM prompt).
+        Secondary sort by id ensures deterministic ordering when two messages
+        share the same created_at timestamp.
+        """
         result = await self.db.execute(
             select(AgentConversation)
             .where(AgentConversation.session_id == session_id)
-            .order_by(AgentConversation.created_at.asc())
+            .order_by(AgentConversation.created_at.desc(), AgentConversation.id.desc())
             .limit(limit)
         )
-        return list(result.scalars().all())
+        messages = list(result.scalars().all())
+        messages.reverse()
+        return messages

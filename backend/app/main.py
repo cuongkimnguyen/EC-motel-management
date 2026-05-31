@@ -27,9 +27,14 @@ from app.scheduler import setup_scheduler, scheduler
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     setup_scheduler()
-    yield
-    scheduler.shutdown(wait=False)
-    await engine.dispose()
+    try:
+        yield
+    finally:
+        try:
+            if scheduler.running:
+                scheduler.shutdown(wait=False)
+        finally:
+            await engine.dispose()
 
 
 def create_app() -> FastAPI:

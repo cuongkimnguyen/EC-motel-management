@@ -1,6 +1,8 @@
 import uuid
 from unittest.mock import MagicMock, patch
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.modules.agent.models import AgentConversation
 
 
 async def test_get_agent_overview(client: AsyncClient, auth_headers: dict):
@@ -78,3 +80,40 @@ async def test_chat_fallback_on_llm_error(client: AsyncClient, auth_headers: dic
 async def test_agent_requires_auth(client: AsyncClient):
     resp = await client.get("/api/agent/overview")
     assert resp.status_code == 401
+
+
+async def test_history_window_returns_latest_n_messages(db: AsyncSession, admin_user):
+    """Regression: get_history() must return the LATEST limit messages, not the first N.
+
+    With 25 messages and limit=20, the result must be messages 5–24 (indices 5-24),
+    NOT messages 0–19. The returned list must still be in chronological order (oldest first).
+    """
+    from datetime import datetime, timezone, timedelta
+    from app.modules.agent.repository import AgentRepository
+
+    session_id = str(uuid.uuid4())
+    repo = AgentRepository(db)
+    base_time = datetime.now(timezone.utc)
+
+    # Insert 25 messages with explicit, distinct created_at values so ordering is stable
+    for i in range(25):
+        db.add(AgentConversation(
+            session_id=session_id,
+            role="user",
+            content=f"message-{i}",
+            message_type="text",
+            user_id=admin_user.id,
+            created_at=base_time + timedelta(seconds=i),
+        ))
+    await db.flush()
+
+    history = await repo.get_history(session_id, limit=20)
+
+    assert len(history) == 20
+    # Must be the LATEST 20 (messages 5–24), returned oldest-first
+    contents = [m.content for m in history]
+    assert contents[0] == "message-5"
+    assert contents[-1] == "message-24"
+    # message-0 through message-4 must NOT be in the window
+    assert "message-0" not in contents
+    assert "message-4" not in contents

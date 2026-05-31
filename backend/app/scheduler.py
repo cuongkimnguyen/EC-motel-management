@@ -18,7 +18,12 @@ scheduler = AsyncIOScheduler(timezone="Asia/Ho_Chi_Minh")
 
 
 async def sync_contract_expiry_statuses() -> None:
-    """Batch-update contract statuses; refresh notification cache."""
+    """Batch-update contract statuses; refresh notification cache.
+
+    Contract status updates and notification upserts run in a single transaction.
+    The notification refresh reads contracts via the same session, so it sees
+    the uncommitted status changes — no intermediate commit needed.
+    """
     from sqlalchemy import update
     from app.modules.contracts.models import Contract
     import app.modules.notifications.service as ns
@@ -50,13 +55,14 @@ async def sync_contract_expiry_statuses() -> None:
             .values(status="Đã hết hạn")
         )
 
-        await db.commit()
-
-        # Force notification refresh
+        # Notification refresh reads from the same session — sees the updated
+        # contract rows without an intermediate commit. Single commit at the end
+        # makes status updates + notification upserts atomic.
         ns._last_refresh_at = None
         from app.modules.notifications.service import NotificationService
-        notif_svc = NotificationService(db)
-        await notif_svc._refresh()
+        await NotificationService(db)._refresh()
+
+        await db.commit()
 
     logger.info("Contract expiry sync completed for %s", today)
 
@@ -84,6 +90,16 @@ async def publish_scheduled_posts() -> None:
 
 
 def setup_scheduler() -> None:
+    """Register jobs and start the scheduler.
+
+    Idempotent: if the scheduler is already running (e.g. called twice due to
+    hot-reload or test re-import), skip setup to avoid duplicate job registration
+    or a "scheduler already running" error from APScheduler.
+    """
+    if scheduler.running:
+        logger.info("APScheduler already running; setup skipped")
+        return
+
     scheduler.add_job(
         sync_contract_expiry_statuses,
         trigger="cron",
