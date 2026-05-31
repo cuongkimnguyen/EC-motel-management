@@ -17,6 +17,9 @@ from app.modules.activity.models import ActivityLog  # noqa: F401 — ensures ta
 from app.modules.notifications.models import Notification  # noqa: F401 — ensures table is registered
 from app.modules.conversations.models import ChatConversation, ChatMessage  # noqa: F401
 from app.modules.posts.models import Post  # noqa: F401
+from app.modules.workflow_templates.models import WorkflowTemplate  # noqa: F401
+from app.modules.automations.models import Automation, AgentTaskHistory  # noqa: F401
+from app.modules.agent.models import AgentConversation  # noqa: F401
 from app.modules.rooms.models import Room  # noqa: F401 — ensures table is registered
 from app.modules.tenants.models import Tenant  # noqa: F401 — ensures table is registered
 from app.modules.users.models import User  # noqa: F401 — ensures table is registered
