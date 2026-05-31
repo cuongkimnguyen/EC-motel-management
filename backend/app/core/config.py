@@ -12,5 +12,13 @@ class Settings(BaseSettings):
     REFRESH_TOKEN_EXPIRE_DAYS: int = 30
     ANTHROPIC_API_KEY: str = ""
 
+    # Facebook / Meta Messenger
+    META_GRAPH_API_VERSION: str = "v21.0"
+    FACEBOOK_PAGE_ID: str = ""
+    FACEBOOK_PAGE_ACCESS_TOKEN: str = ""
+    FACEBOOK_VERIFY_TOKEN: str = ""
+    FACEBOOK_APP_SECRET: str = ""
+    FACEBOOK_WEBHOOK_ENABLED: bool = False
+
 
 settings = Settings()
