@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head><meta charset="UTF-8"><title>Nhac nho thanh toan</title></head>
+<body style="font-family:Arial,sans-serif;color:#1e293b;max-width:600px;margin:auto;padding:20px">
+  <div style="background:#1e40af;padding:20px;border-radius:8px 8px 0 0">
+    <h1 style="color:white;margin:0;font-size:20px">MotelManage — Nhac nho thanh toan</h1>
+  </div>
+  <div style="border:1px solid #e5e7eb;border-top:0;padding:24px;border-radius:0 0 8px 8px">
+    <p>Kinh gui <strong>{{ tenant_name }}</strong>,</p>
+    <p>Day la thong bao nhac nho ve ky thanh toan tien thue phong <strong>{{ room_code }}</strong>.</p>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0">
+      <tr style="background:#f8fafc">
+        <td style="padding:10px;border:1px solid #e5e7eb">Phong</td>
+        <td style="padding:10px;border:1px solid #e5e7eb"><strong>{{ room_code }}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding:10px;border:1px solid #e5e7eb">Ky thanh toan</td>
+        <td style="padding:10px;border:1px solid #e5e7eb">{{ billing_period }}</td>
+      </tr>
+      <tr style="background:#f8fafc">
+        <td style="padding:10px;border:1px solid #e5e7eb">So tien can thanh toan</td>
+        <td style="padding:10px;border:1px solid #e5e7eb;color:#dc2626;font-weight:bold">
+          {{ "{:,}".format(amount_due|int) }} VND
+        </td>
+      </tr>
+      <tr>
+        <td style="padding:10px;border:1px solid #e5e7eb">Han thanh toan</td>
+        <td style="padding:10px;border:1px solid #e5e7eb">{{ due_date }}</td>
+      </tr>
+    </table>
+    <p>Vui long thanh toan dung han. Cam on ban!</p>
+    <p style="color:#64748b;font-size:13px;margin-top:24px">
+      Email nay duoc gui tu dong tu he thong MotelManage. Vui long khong tra loi email nay.
+    </p>
+  </div>
+</body>
+</html>

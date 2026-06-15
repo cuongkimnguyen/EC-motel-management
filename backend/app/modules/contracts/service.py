@@ -204,3 +204,33 @@ class ContractService:
         if contract.status in ("Đang hiệu lực", "Sắp hết hạn"):
             raise HTTPException(status_code=409, detail="Không thể xóa hợp đồng đang hiệu lực")
         await self.repo.delete(contract)
+
+    async def export_excel(self) -> tuple[list[str], list[list]]:
+        """Return headers + rows for Excel export with joined room/tenant data."""
+        contracts, _ = await self.repo.list_contracts(page=1, limit=10_000)
+        headers = [
+            "Mã hợp đồng", "Phòng", "Khách thuê", "SĐT", "CCCD",
+            "Ngày bắt đầu", "Ngày kết thúc", "Tiền thuê (VND)",
+            "Đặt cọc (VND)", "Trạng thái", "Còn lại (ngày)", "Ghi chú",
+        ]
+        today = date.today()
+        rows = []
+        for c in contracts:
+            room = await self.room_repo.get_by_id(c.room_id)
+            tenant = await self.tenant_repo.get_by_id(c.tenant_id)
+            days_left = c.days_until_expiry
+            rows.append([
+                c.code,
+                room.code if room else "",
+                tenant.full_name if tenant else "",
+                tenant.phone if tenant else "",
+                tenant.cccd if tenant else "",
+                str(c.start_date),
+                str(c.end_date),
+                c.monthly_rent,
+                c.deposit,
+                c.status,
+                days_left if days_left is not None else "–",
+                c.notes or "",
+            ])
+        return headers, rows

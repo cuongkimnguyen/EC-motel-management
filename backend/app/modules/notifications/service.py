@@ -118,3 +118,112 @@ class NotificationService:
     async def mark_all_read(self) -> dict:
         await self.repo.mark_all_read()
         return {"ok": True}
+
+    async def send_payment_reminders(self) -> int:
+        """Send payment reminder emails to all tenants with outstanding debt.
+
+        Returns number of emails successfully dispatched.
+        """
+        from app.integrations.email import send_email
+        from app.modules.tenants.models import Tenant
+        from app.modules.contracts.models import Contract
+
+        result = await self.db.execute(
+            select(Tenant).where(Tenant.debt > 0)
+        )
+        tenants = result.scalars().all()
+
+        sent = 0
+        for tenant in tenants:
+            if not getattr(tenant, "email", None):
+                continue
+
+            contract_result = await self.db.execute(
+                select(Contract).where(
+                    Contract.tenant_id == tenant.id,
+                    Contract.terminated_at.is_(None),
+                    Contract.end_date >= date.today(),
+                ).limit(1)
+            )
+            contract = contract_result.scalar_one_or_none()
+            room_code = "N/A"
+            if contract:
+                from app.modules.rooms.models import Room
+                room_result = await self.db.execute(
+                    select(Room).where(Room.id == contract.room_id)
+                )
+                room = room_result.scalar_one_or_none()
+                if room:
+                    room_code = room.code
+
+            await send_email(
+                to=tenant.email,
+                subject=f"[MotelManage] Nhac nho thanh toan — {room_code}",
+                template="payment_reminder.html",
+                context={
+                    "tenant_name": tenant.full_name,
+                    "room_code": room_code,
+                    "billing_period": date.today().strftime("%Y-%m"),
+                    "amount_due": tenant.debt,
+                    "due_date": f"ngay 5 thang {date.today().month + 1}",
+                },
+            )
+            sent += 1
+
+        return sent
+
+    async def send_expiry_warnings(self) -> int:
+        """Send contract expiry warning emails for contracts expiring within 30 days.
+
+        Returns number of emails dispatched.
+        """
+        from app.integrations.email import send_email
+        from app.modules.contracts.models import Contract
+        from app.modules.tenants.models import Tenant
+
+        today = date.today()
+        warning_date = today + timedelta(days=30)
+
+        result = await self.db.execute(
+            select(Contract).where(
+                Contract.terminated_at.is_(None),
+                Contract.end_date >= today,
+                Contract.end_date <= warning_date,
+            )
+        )
+        contracts = result.scalars().all()
+
+        sent = 0
+        for contract in contracts:
+            tenant_result = await self.db.execute(
+                select(Tenant).where(Tenant.id == contract.tenant_id)
+            )
+            tenant = tenant_result.scalar_one_or_none()
+            if not tenant or not getattr(tenant, "email", None):
+                continue
+
+            room_code = ""
+            from app.modules.rooms.models import Room
+            room_result = await self.db.execute(
+                select(Room).where(Room.id == contract.room_id)
+            )
+            room = room_result.scalar_one_or_none()
+            if room:
+                room_code = room.code
+
+            days_left = (contract.end_date - today).days
+            await send_email(
+                to=tenant.email,
+                subject=f"[MotelManage] Hop dong {contract.code} sap het han",
+                template="contract_expiry.html",
+                context={
+                    "tenant_name": tenant.full_name,
+                    "contract_code": contract.code,
+                    "room_code": room_code,
+                    "end_date": str(contract.end_date),
+                    "days_left": days_left,
+                },
+            )
+            sent += 1
+
+        return sent

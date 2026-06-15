@@ -1,6 +1,10 @@
+from datetime import date as _date
+
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.export import build_excel_workbook, excel_response
 from app.common.pagination import PaginationParams
 from app.core.database import get_db
 from app.core.dependencies import require_admin
@@ -14,6 +18,23 @@ from app.modules.contracts.schemas import (
 from app.modules.contracts.service import ContractService
 
 router = APIRouter(prefix="/api/contracts", tags=["contracts"])
+
+
+@router.get("/export")
+async def export_contracts(
+    format: str = Query("excel"),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(require_admin),
+) -> StreamingResponse:
+    headers, rows = await ContractService(db).export_excel()
+    filename = f"contracts_{_date.today().strftime('%Y-%m-%d')}.xlsx"
+    wb = build_excel_workbook(
+        sheet_name="Hợp đồng",
+        headers=headers,
+        rows=rows,
+        col_widths=[16, 10, 24, 14, 14, 12, 12, 16, 16, 18, 12, 30],
+    )
+    return excel_response(wb, filename)
 
 
 @router.get("", response_model=dict)

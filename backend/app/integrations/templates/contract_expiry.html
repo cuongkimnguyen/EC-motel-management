@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head><meta charset="UTF-8"><title>Hop dong sap het han</title></head>
+<body style="font-family:Arial,sans-serif;color:#1e293b;max-width:600px;margin:auto;padding:20px">
+  <div style="background:#b45309;padding:20px;border-radius:8px 8px 0 0">
+    <h1 style="color:white;margin:0;font-size:20px">MotelManage — Hop dong sap het han</h1>
+  </div>
+  <div style="border:1px solid #e5e7eb;border-top:0;padding:24px;border-radius:0 0 8px 8px">
+    <p>Kinh gui <strong>{{ tenant_name }}</strong>,</p>
+    <p>Hop dong thue phong cua ban se <strong>het han trong {{ days_left }} ngay</strong>.</p>
+    <table style="width:100%;border-collapse:collapse;margin:16px 0">
+      <tr style="background:#f8fafc">
+        <td style="padding:10px;border:1px solid #e5e7eb">Ma hop dong</td>
+        <td style="padding:10px;border:1px solid #e5e7eb"><strong>{{ contract_code }}</strong></td>
+      </tr>
+      <tr>
+        <td style="padding:10px;border:1px solid #e5e7eb">Phong</td>
+        <td style="padding:10px;border:1px solid #e5e7eb">{{ room_code }}</td>
+      </tr>
+      <tr style="background:#f8fafc">
+        <td style="padding:10px;border:1px solid #e5e7eb">Ngay het han</td>
+        <td style="padding:10px;border:1px solid #e5e7eb;color:#b45309;font-weight:bold">{{ end_date }}</td>
+      </tr>
+    </table>
+    <p>Vui long lien he chu nha de gia han hoac sap xep tra phong. Cam on!</p>
+    <p style="color:#64748b;font-size:13px;margin-top:24px">
+      Email nay duoc gui tu dong tu he thong MotelManage.
+    </p>
+  </div>
+</body>
+</html>

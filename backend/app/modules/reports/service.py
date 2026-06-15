@@ -141,3 +141,88 @@ class ReportsService:
             financial_report=financial,
             tenant_debt_list=debt_list,
         )
+
+    async def export_excel(
+        self,
+        period_type: str,
+        selected_month: int,
+        selected_quarter: int,
+        selected_year: int,
+        building_id: str,
+    ) -> tuple[list[str], list[list]]:
+        """Build KPI summary sheet for Excel export."""
+        overview = await self.get_overview(
+            period_type=period_type,
+            selected_month=selected_month,
+            selected_quarter=selected_quarter,
+            selected_year=selected_year,
+            building_id=building_id,
+            compare_with_previous=False,
+        )
+        kpi = overview.kpi
+        headers = ["Chỉ số", "Giá trị"]
+        rows = [
+            ["Tổng doanh thu (VND)", f"{kpi.total_revenue:,}"],
+            ["Tổng chi phí (VND)", f"{kpi.total_expense:,}"],
+            ["Lợi nhuận ròng (VND)", f"{kpi.net_profit:,}"],
+            ["Tỷ lệ lấp đầy (%)", f"{kpi.occupancy_rate:.1f}%"],
+            ["Tổng công nợ (VND)", f"{kpi.total_debt:,}"],
+            ["Hợp đồng sắp hết hạn", str(kpi.expiring_contracts)],
+        ]
+        return headers, rows
+
+    async def export_pdf(
+        self,
+        period_type: str,
+        selected_month: int,
+        selected_quarter: int,
+        selected_year: int,
+        building_id: str,
+    ) -> str:
+        """Build an HTML string for PDF export."""
+        overview = await self.get_overview(
+            period_type=period_type,
+            selected_month=selected_month,
+            selected_quarter=selected_quarter,
+            selected_year=selected_year,
+            building_id=building_id,
+            compare_with_previous=False,
+        )
+        kpi = overview.kpi
+
+        period_label = (
+            f"Tháng {selected_month}/{selected_year}"
+            if period_type == "month"
+            else str(selected_year)
+        )
+        building_label = f"Tòa {building_id}" if building_id != "all" else "Tất cả tòa nhà"
+
+        html = f"""<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<style>
+  body {{ font-family: Arial, sans-serif; color: #1e293b; margin: 40px; }}
+  h1 {{ color: #1e40af; font-size: 22px; }}
+  table {{ width: 100%; border-collapse: collapse; margin-top: 12px; }}
+  th {{ background: #1e40af; color: white; padding: 8px 12px; text-align: left; }}
+  td {{ padding: 7px 12px; border-bottom: 1px solid #f1f5f9; }}
+  tr:nth-child(even) td {{ background: #f8fafc; }}
+  .meta {{ color: #64748b; font-size: 12px; margin-bottom: 20px; }}
+</style>
+</head>
+<body>
+<h1>Bao cao van hanh — MotelManage</h1>
+<p class="meta">Ky: {period_label} | Khu vuc: {building_label}</p>
+<table>
+  <tr><th>Chi so</th><th>Gia tri</th></tr>
+  <tr><td>Tong doanh thu</td><td>{kpi.total_revenue:,} VND</td></tr>
+  <tr><td>Tong chi phi</td><td>{kpi.total_expense:,} VND</td></tr>
+  <tr><td>Loi nhuan rong</td><td>{kpi.net_profit:,} VND</td></tr>
+  <tr><td>Ty le lap day</td><td>{kpi.occupancy_rate:.1f}%</td></tr>
+  <tr><td>Tong cong no</td><td>{kpi.total_debt:,} VND</td></tr>
+  <tr><td>Hop dong sap het han</td><td>{kpi.expiring_contracts}</td></tr>
+</table>
+</body>
+</html>"""
+        return html

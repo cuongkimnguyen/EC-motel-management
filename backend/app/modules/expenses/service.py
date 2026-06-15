@@ -70,3 +70,30 @@ class ExpenseService:
             raise HTTPException(status_code=404, detail="Chi phí không tồn tại")
         expense = await self.repo.update(expense, payment_status="Đã thanh toán")
         return ExpenseResponse.model_validate(expense)
+
+    async def export_excel(self) -> tuple[list[str], list[list]]:
+        """Return headers + rows for Excel export (all expenses, no pagination)."""
+        expenses, _ = await self.repo.list_expenses(page=1, limit=10_000)
+        headers = [
+            "Mã chi phí", "Tiêu đề", "Danh mục", "Số tiền (VND)",
+            "Ngày chi", "Trạng thái", "Phương thức", "Tòa nhà", "Ghi chú",
+        ]
+        rows = [
+            [
+                e.code, e.title, e.category, e.amount,
+                str(e.expense_date), e.payment_status, e.payment_method,
+                e.building_name, e.note or "",
+            ]
+            for e in expenses
+        ]
+        return headers, rows
+
+    async def upload_receipt(self, expense_id: str, file_bytes: bytes, filename: str) -> ExpenseResponse:
+        from app.integrations.storage import upload_expense_receipt
+
+        expense = await self.repo.get_by_id(expense_id)
+        if not expense:
+            raise HTTPException(status_code=404, detail="Chi phí không tồn tại")
+        url = await upload_expense_receipt(file_bytes, filename)
+        expense = await self.repo.update(expense, receipt_image=url)
+        return ExpenseResponse.model_validate(expense)

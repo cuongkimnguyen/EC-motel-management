@@ -72,3 +72,15 @@ class RoomService:
             raise HTTPException(status_code=404, detail="Phòng không tồn tại")
         room = await self.repo.update(room, status=status)
         return await self._to_response(room)
+
+    async def upload_image(self, room_id: str, file_bytes: bytes, filename: str) -> RoomResponse:
+        from app.integrations.storage import upload_room_image
+
+        room = await self.repo.get_by_id(room_id)
+        if not room:
+            raise HTTPException(status_code=404, detail="Phòng không tồn tại")
+        url = await upload_room_image(file_bytes, filename)
+        current_images = list(room.images or [])
+        current_images.append(url)
+        room = await self.repo.update(room, images=current_images)
+        return await self._to_response(room)

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head><meta charset="UTF-8"><title>Bao cao tuan</title></head>
+<body style="font-family:Arial,sans-serif;color:#1e293b;max-width:600px;margin:auto;padding:20px">
+  <div style="background:#1e40af;padding:20px;border-radius:8px 8px 0 0">
+    <h1 style="color:white;margin:0;font-size:20px">MotelManage — Tom tat van hanh tuan</h1>
+  </div>
+  <div style="border:1px solid #e5e7eb;border-top:0;padding:24px;border-radius:0 0 8px 8px">
+    <p>Kinh gui <strong>{{ owner_name }}</strong>,</p>
+    <p>Day la tom tat tinh hinh van hanh tuan <strong>{{ week_label }}</strong>:</p>
+
+    <h2 style="font-size:15px;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:6px">Phong</h2>
+    <ul>
+      <li>Tong phong: <strong>{{ total_rooms }}</strong></li>
+      <li>Dang thue: <strong>{{ occupied_rooms }}</strong></li>
+      <li>Phong trong: <strong>{{ vacant_rooms }}</strong></li>
+    </ul>
+
+    <h2 style="font-size:15px;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:6px">Hop dong</h2>
+    <ul>
+      <li>Sap het han (30 ngay): <strong>{{ expiring_contracts }}</strong></li>
+    </ul>
+
+    <h2 style="font-size:15px;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:6px">Cong no</h2>
+    <ul>
+      <li>Khach dang no: <strong>{{ debt_tenants }}</strong> nguoi</li>
+      <li>Tong cong no: <strong>{{ total_debt_formatted }}</strong> VND</li>
+    </ul>
+
+    <p style="color:#64748b;font-size:13px;margin-top:24px">
+      Email nay duoc gui tu dong moi thu Hai tu he thong MotelManage.
+    </p>
+  </div>
+</body>
+</html>
