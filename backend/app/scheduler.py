@@ -109,8 +109,8 @@ async def send_weekly_digest() -> None:
         result = await db.execute(select(Room))
         rooms = result.scalars().all()
         total_rooms = len(rooms)
-        occupied = sum(1 for r in rooms if r.status == "Dang thue")
-        vacant = sum(1 for r in rooms if r.status == "Trong")
+        occupied = sum(1 for r in rooms if r.status == "Đang thuê")
+        vacant = sum(1 for r in rooms if r.status == "Trống")
 
         result = await db.execute(
             select(func.count()).select_from(Contract).where(
