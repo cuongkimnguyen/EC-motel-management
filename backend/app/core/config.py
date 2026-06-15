@@ -20,5 +20,20 @@ class Settings(BaseSettings):
     FACEBOOK_APP_SECRET: str = ""
     FACEBOOK_WEBHOOK_ENABLED: bool = False
 
+    # Supabase Storage
+    SUPABASE_URL: str = ""
+    SUPABASE_KEY: str = ""
+    STORAGE_BUCKET_ROOMS: str = "room-images"
+    STORAGE_BUCKET_EXPENSES: str = "expense-receipts"
+
+    # Email (SMTP)
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM_NAME: str = "MotelManage"
+    SMTP_FROM_EMAIL: str = ""
+    EMAIL_ENABLED: bool = False
+
 
 settings = Settings()

@@ -19,6 +19,7 @@ class Tenant(Base):
     date_of_birth: Mapped[date] = mapped_column(Date(), nullable=False)
     permanent_address: Mapped[str] = mapped_column(Text(), nullable=False)
     current_room_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     occupation: Mapped[str | None] = mapped_column(String(255), nullable=True)
     license_plate: Mapped[str | None] = mapped_column(String(50), nullable=True)
     debt: Mapped[int] = mapped_column(BigInteger(), nullable=False, default=0)

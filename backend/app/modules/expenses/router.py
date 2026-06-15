@@ -1,8 +1,10 @@
 from datetime import date
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.export import build_excel_workbook, excel_response
 from app.common.pagination import PaginationParams
 from app.core.database import get_db
 from app.core.dependencies import require_admin
@@ -10,6 +12,36 @@ from app.modules.expenses.schemas import ExpenseCreate, ExpenseResponse, Expense
 from app.modules.expenses.service import ExpenseService
 
 router = APIRouter(prefix="/api/expenses", tags=["expenses"])
+
+
+@router.get("/export")
+async def export_expenses(
+    format: str = Query("excel"),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(require_admin),
+) -> StreamingResponse:
+    if format != "excel":
+        raise HTTPException(status_code=400, detail="Định dạng không hỗ trợ. Dùng: excel")
+    headers, rows = await ExpenseService(db).export_excel()
+    filename = f"expenses_{date.today().strftime('%Y-%m')}.xlsx"
+    wb = build_excel_workbook(
+        sheet_name="Chi phí",
+        headers=headers,
+        rows=rows,
+        col_widths=[14, 30, 16, 16, 12, 18, 16, 10, 30],
+    )
+    return excel_response(wb, filename)
+
+
+@router.post("/{expense_id}/receipt", response_model=ExpenseResponse)
+async def upload_receipt(
+    expense_id: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    file_bytes = await file.read()
+    return await ExpenseService(db).upload_receipt(expense_id, file_bytes, file.filename or "receipt.bin")
 
 
 @router.get("/stats", response_model=ExpenseStats)

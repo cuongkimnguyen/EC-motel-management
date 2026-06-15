@@ -85,15 +85,36 @@ class PostService:
             await self._sync_room_active_post(room_id)
 
     async def publish_post(self, post_id: str) -> PostResponse:
+        from app.core.config import settings
+        from app.integrations.facebook_graph import publish_page_post
+
         post = await self.repo.get_by_id(post_id)
         if not post:
             raise HTTPException(status_code=404, detail="Bài đăng không tồn tại")
         if post.status == "Đã đăng":
             raise HTTPException(status_code=409, detail="Bài đăng đã được đăng rồi")
+
+        fb_link: str | None = None
+        final_status = "Đã đăng"
+
+        is_fb_channel = post.channel in ("Facebook Page", "Facebook Group")
+        if is_fb_channel and settings.FACEBOOK_WEBHOOK_ENABLED and settings.FACEBOOK_PAGE_ACCESS_TOKEN:
+            try:
+                fb_post_id = await publish_page_post(
+                    message=post.content,
+                    page_id=settings.FACEBOOK_PAGE_ID,
+                    page_access_token=settings.FACEBOOK_PAGE_ACCESS_TOKEN,
+                    graph_api_version=settings.META_GRAPH_API_VERSION,
+                )
+                fb_link = f"https://www.facebook.com/{fb_post_id}"
+            except Exception:
+                final_status = "Lỗi"
+
         post = await self.repo.update(
             post,
-            status="Đã đăng",
-            posted_date=datetime.now(timezone.utc),
+            status=final_status,
+            posted_date=datetime.now(timezone.utc) if final_status == "Đã đăng" else post.posted_date,
+            fb_link=fb_link,
         )
         await self._sync_room_active_post(post.room_id)
         return await self._to_response(post)

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.pagination import PaginationParams
@@ -71,3 +71,14 @@ async def update_room_status(
     _: dict = Depends(require_admin),
 ):
     return await RoomService(db).update_status(room_id, payload.status)
+
+
+@router.post("/{room_id}/images", response_model=RoomResponse)
+async def upload_room_image(
+    room_id: str,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(require_admin),
+):
+    file_bytes = await file.read()
+    return await RoomService(db).upload_image(room_id, file_bytes, file.filename or "image.jpg")

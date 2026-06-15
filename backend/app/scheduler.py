@@ -89,6 +89,60 @@ async def publish_scheduled_posts() -> None:
             logger.info("Auto-published %d scheduled posts", len(posts))
 
 
+async def send_weekly_digest() -> None:
+    """Monday 07:00 — send operational summary to the admin email."""
+    from app.core.config import settings
+    from app.integrations.email import send_email
+    from sqlalchemy import select, func
+
+    if not settings.EMAIL_ENABLED or not settings.SMTP_FROM_EMAIL:
+        return
+
+    async with AsyncSessionLocal() as db:
+        from app.modules.rooms.models import Room
+        from app.modules.contracts.models import Contract
+        from app.modules.tenants.models import Tenant
+
+        today = date.today()
+        week_label = today.strftime("%d/%m/%Y")
+
+        result = await db.execute(select(Room))
+        rooms = result.scalars().all()
+        total_rooms = len(rooms)
+        occupied = sum(1 for r in rooms if r.status == "Đang thuê")
+        vacant = sum(1 for r in rooms if r.status == "Trống")
+
+        result = await db.execute(
+            select(func.count()).select_from(Contract).where(
+                Contract.terminated_at.is_(None),
+                Contract.end_date >= today,
+                Contract.end_date <= today + timedelta(days=30),
+            )
+        )
+        expiring = result.scalar() or 0
+
+        result = await db.execute(select(Tenant).where(Tenant.debt > 0))
+        debt_tenants = result.scalars().all()
+        total_debt = sum(t.debt for t in debt_tenants)
+
+        await send_email(
+            to=settings.SMTP_FROM_EMAIL,
+            subject=f"[MotelManage] Tom tat van hanh tuan — {week_label}",
+            template="weekly_digest.html",
+            context={
+                "owner_name": "Chu nha",
+                "week_label": week_label,
+                "total_rooms": total_rooms,
+                "occupied_rooms": occupied,
+                "vacant_rooms": vacant,
+                "expiring_contracts": expiring,
+                "debt_tenants": len(debt_tenants),
+                "total_debt_formatted": f"{total_debt:,}",
+            },
+        )
+        logger.info("Weekly digest sent for week %s", week_label)
+
+
 def setup_scheduler() -> None:
     """Register jobs and start the scheduler.
 
@@ -113,6 +167,15 @@ def setup_scheduler() -> None:
         trigger="interval",
         minutes=5,
         id="publish_scheduled_posts",
+        replace_existing=True,
+    )
+    scheduler.add_job(
+        send_weekly_digest,
+        trigger="cron",
+        day_of_week="mon",
+        hour=7,
+        minute=0,
+        id="weekly_digest",
         replace_existing=True,
     )
     scheduler.start()
