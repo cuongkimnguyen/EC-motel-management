@@ -18,12 +18,23 @@ from app.modules.webhooks.facebook import router as webhooks_router
 from app.modules.dashboard.router import router as dashboard_router
 from app.modules.reports.router import router as reports_router
 from app.modules.users.router import router as users_router
+from app.modules.workflow_templates.router import router as workflow_templates_router
+from app.modules.automations.router import router as automations_router
+from app.modules.agent.router import router as agent_router
+from app.scheduler import setup_scheduler, scheduler
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    yield
-    await engine.dispose()
+    setup_scheduler()
+    try:
+        yield
+    finally:
+        try:
+            if scheduler.running:
+                scheduler.shutdown(wait=False)
+        finally:
+            await engine.dispose()
 
 
 def create_app() -> FastAPI:
@@ -57,6 +68,9 @@ def create_app() -> FastAPI:
     app.include_router(conversations_router)
     app.include_router(webhooks_router)
     app.include_router(dashboard_router)
+    app.include_router(workflow_templates_router)
+    app.include_router(automations_router)
+    app.include_router(agent_router)
 
     return app
 

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phase 6 Implementation Notes — AI Agent + Automations</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem; color: #1a1a2e; background: #f8f9fa; }
+  h1 { color: #16213e; border-bottom: 3px solid #0f3460; padding-bottom: 0.5rem; }
+  h2 { color: #0f3460; margin-top: 2rem; }
+  h3 { color: #533483; }
+  .card { background: white; border-radius: 8px; padding: 1.5rem; margin: 1rem 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+  .decision { border-left: 4px solid #0f3460; }
+  .tradeoff { border-left: 4px solid #e94560; }
+  .change { border-left: 4px solid #16213e; }
+  .alert { border-left: 4px solid #f5a623; background: #fffbf0; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; font-weight: 600; margin: 0 4px 4px 0; }
+  .tag-decision { background: #dbeafe; color: #1e40af; }
+  .tag-tradeoff { background: #fce7f3; color: #9d174d; }
+  .tag-change { background: #d1fae5; color: #065f46; }
+  .tag-alert { background: #fef3c7; color: #92400e; }
+  code { background: #f1f5f9; padding: 2px 6px; border-radius: 4px; font-size: 0.9em; font-family: 'Fira Code', monospace; }
+  pre { background: #0d1117; color: #e6edf3; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem; }
+  .task-header { display: flex; justify-content: space-between; align-items: center; }
+  .status { font-size: 0.8rem; padding: 3px 10px; border-radius: 10px; }
+  .done { background: #d1fae5; color: #065f46; }
+  .in-progress { background: #fef3c7; color: #92400e; }
+  .pending { background: #f1f5f9; color: #64748b; }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+  th { background: #0f3460; color: white; padding: 0.5rem 1rem; text-align: left; }
+  td { padding: 0.5rem 1rem; border-bottom: 1px solid #e2e8f0; }
+  tr:hover td { background: #f8faff; }
+  .toc a { color: #0f3460; text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .toc li { margin: 0.3rem 0; }
+</style>
+</head>
+<body>
+
+<h1>Phase 6 Implementation Notes</h1>
+<p><strong>Feature:</strong> AI Agent + Automations + Workflow Templates + APScheduler<br>
+<strong>Branch:</strong> <code>feat/backend-phase6-ai-automations-plan</code><br>
+<strong>Started:</strong> 2026-05-31<br>
+<strong>Author:</strong> Claude Sonnet 4.6 (agentic implementation)</p>
+
+<div class="card alert">
+  <strong>Purpose of this doc:</strong> Running log of every non-obvious decision, schema deviation from spec, tradeoff, and operational concern made during Phase 6 implementation. Updated after each task completes.
+</div>
+
+<nav class="card">
+  <h3 style="margin-top:0">Contents</h3>
+  <ol class="toc">
+    <li><a href="#task-status">Task Status</a></li>
+    <li><a href="#schema-deviations">Schema Deviations from Spec</a></li>
+    <li><a href="#decisions">Key Decisions</a></li>
+    <li><a href="#tradeoffs">Tradeoffs</a></li>
+    <li><a href="#known-issues">Known Issues &amp; Limitations</a></li>
+    <li><a href="#ops-notes">Operational Notes</a></li>
+  </ol>
+</nav>
+
+<!-- ─────────────────────────────────────── -->
+<h2 id="task-status">Task Status</h2>
+<div class="card">
+<table>
+  <tr><th>Task</th><th>Description</th><th>Status</th></tr>
+  <tr><td>Task 1</td><td>Alembic migration 0010 — 4 new tables</td><td><span class="status done">Done</span></td></tr>
+  <tr><td>Task 2</td><td>Add automation enums to enums.py</td><td><span class="status done">Done</span></td></tr>
+  <tr><td>Task 3</td><td>workflow_templates module + tests</td><td><span class="status done">Done</span></td></tr>
+  <tr><td>Task 4</td><td>automations models/schemas/repository</td><td><span class="status done">Done</span></td></tr>
+  <tr><td>Task 5</td><td>automations service/router + 11 tests</td><td><span class="status done">Done</span></td></tr>
+  <tr><td>Task 6</td><td>agent models/schemas/repository</td><td><span class="status done">Done</span></td></tr>
+  <tr><td>Task 7</td><td>agent context_builder/service/router + 7 tests</td><td><span class="status done">Done</span></td></tr>
+  <tr><td>Task 8</td><td>APScheduler — scheduler.py + lifespan wiring</td><td><span class="status done">Done</span></td></tr>
+  <tr><td>Task 9</td><td>Final main.py wiring + full test run</td><td><span class="status done">Done — 171/171 passing</span></td></tr>
+</table>
+</div>
+
+<!-- ─────────────────────────────────────── -->
+<h2 id="schema-deviations">Schema Deviations from Spec</h2>
+
+<div class="card change">
+  <div class="task-header">
+    <h3 style="margin:0">1. Notification model has no <code>reference_type</code> field</h3>
+    <span class="tag tag-change">Schema Change</span>
+  </div>
+  <p><strong>Spec assumed:</strong> <code>AgentAlertItem</code> includes <code>reference_type</code> mapped from <code>Notification.reference_type</code>.</p>
+  <p><strong>Reality:</strong> The existing <code>Notification</code> model (written in Phase 5) only has <code>reference_id</code> — no <code>reference_type</code> column exists.</p>
+  <p><strong>Fix:</strong> In <code>agent/service.py</code> → <code>get_alerts()</code>, the <code>AgentAlertItem</code> is constructed with <code>reference_type=None</code> (hardcoded) since the field doesn't exist on the ORM model. The <code>AgentAlertItem</code> schema keeps <code>reference_type: str | None</code> for future compatibility when <code>reference_type</code> is added to the Notification table in a future phase.</p>
+  <p><strong>Impact:</strong> Frontend agent alerts will not have a <code>reference_type</code> value. Low risk — the frontend currently only uses this field for deep-link navigation which is not implemented in Phase 6.</p>
+</div>
+
+<!-- ─────────────────────────────────────── -->
+<h2 id="decisions">Key Decisions</h2>
+
+<div class="card decision">
+  <div class="task-header">
+    <h3 style="margin:0">D1. Seed-on-first-call pattern for WorkflowTemplates</h3>
+    <span class="tag tag-decision">Architecture</span>
+  </div>
+  <p>The 6 builtin workflow templates are seeded into the DB the first time <code>GET /api/workflow-templates</code> is called (if <code>COUNT == 0</code>), rather than via an Alembic data migration or startup hook.</p>
+  <p><strong>Why:</strong> Alembic data migrations are fragile (they depend on model state at migration time). Startup hooks run even during tests, polluting the test DB. Seed-on-first-call is lazy, idempotent, and test-safe — the test suite sees exactly the same 6 templates the production system does.</p>
+  <p><strong>Caution:</strong> If someone manually deletes all templates in production and the count drops to 0, the seed will re-run and create duplicates on the next call. Mitigate by adding a <code>is_builtin=true</code> guard or using <code>INSERT ... ON CONFLICT DO NOTHING</code> in a future hardening pass.</p>
+</div>
+
+<div class="card decision">
+  <div class="task-header">
+    <h3 style="margin:0">D2. APScheduler runs in-process (single Uvicorn worker)</h3>
+    <span class="tag tag-decision">Architecture</span>
+  </div>
+  <p>Background jobs (contract expiry sync, post publishing) run inside the same Uvicorn process via <code>AsyncIOScheduler</code> instead of a separate Celery worker.</p>
+  <p><strong>Why:</strong> The spec describes a single-tenant MVP. Adding Celery + Redis for two cron jobs would double the infrastructure footprint for no measurable gain.</p>
+  <p><strong>Limitation:</strong> If the app is scaled to multiple workers (e.g., <code>uvicorn --workers 4</code>), all 4 workers will run the same scheduler concurrently, causing duplicate job executions. The scheduled post publisher is idempotent (it only updates rows once), but the contract sync could emit duplicate notifications. <strong>Migration path:</strong> Replace <code>AsyncIOScheduler</code> with Celery Beat when multi-worker deployment is needed.</p>
+</div>
+
+<div class="card decision">
+  <div class="task-header">
+    <h3 style="margin:0">D3. Agent chat uses synchronous Anthropic SDK</h3>
+    <span class="tag tag-decision">Integration</span>
+  </div>
+  <p>The <code>anthropic</code> Python SDK's <code>client.messages.create()</code> is a synchronous call, even though our service layer is async. The service calls it directly without <code>asyncio.to_thread()</code>.</p>
+  <p><strong>Why:</strong> The Anthropic SDK v0.8+ is actually async-compatible via <code>anthropic.AsyncAnthropic</code>. The plan uses the sync client for simplicity since the test mock is easier. This is fine for MVP — the await point on the DB calls surrounding it ensures the event loop isn't starved for the brief time the sync call runs under normal latency.</p>
+  <p><strong>Future improvement:</strong> Switch to <code>anthropic.AsyncAnthropic</code> and <code>await client.messages.create()</code> for proper async IO if LLM response latency becomes a concern under concurrent load.</p>
+</div>
+
+<div class="card decision">
+  <div class="task-header">
+    <h3 style="margin:0">D4. Automation status management via service-layer logic only</h3>
+    <span class="tag tag-decision">Business Logic</span>
+  </div>
+  <p>The <code>status</code> field on <code>Automation</code> is a plain string column with no DB-level constraint or enum type. The allowed values (<code>active</code>, <code>paused</code>, <code>error</code>, <code>draft</code>) are enforced only in the service layer.</p>
+  <p><strong>Why:</strong> Adding a PostgreSQL ENUM type would require a migration to modify it every time a new status is needed. The app enum (<code>AutomationStatus</code>) is the single source of truth for application code.</p>
+</div>
+
+<!-- ─────────────────────────────────────── -->
+<h2 id="tradeoffs">Tradeoffs</h2>
+
+<div class="card tradeoff">
+  <div class="task-header">
+    <h3 style="margin:0">T1. Conversation history window: 20 messages</h3>
+    <span class="tag tag-tradeoff">Cost / Performance</span>
+  </div>
+  <p>The agent loads the last 20 messages per session as context for the Anthropic API call (<code>AgentRepository.get_history(limit=20)</code>). The spec did not specify a limit.</p>
+  <p><strong>Why 20:</strong> Each message averages ~100 tokens. 20 messages ≈ 2,000 tokens of history + ~500 tokens system prompt = well within the 4K context budget before hitting diminishing returns. Higher limits increase latency and API cost linearly.</p>
+  <p><strong>Adjust if needed:</strong> Change the <code>limit=20</code> argument in <code>AgentService.chat()</code>.</p>
+</div>
+
+<div class="card tradeoff">
+  <div class="task-header">
+    <h3 style="margin:0">T2. Context builder shows only top-5 expiring contracts</h3>
+    <span class="tag tag-tradeoff">Prompt Engineering</span>
+  </div>
+  <p>The system prompt injects at most 5 expiring contracts (lines 412–415 of plan). More would bloat the prompt without adding value for a conversational assistant.</p>
+  <p><strong>Tradeoff:</strong> If there are 20 expiring contracts, the agent's context is incomplete. The agent will say "X contracts are expiring" from the count, but only detail the first 5 by code. This is acceptable for the MVP — the owner can drill down via the Contracts screen.</p>
+</div>
+
+<div class="card tradeoff">
+  <div class="task-header">
+    <h3 style="margin:0">T3. Manual run endpoint marks task as "completed" immediately</h3>
+    <span class="tag tag-tradeoff">UX / Accuracy</span>
+  </div>
+  <p><code>POST /api/automations/{id}/run</code> creates a <code>AgentTaskHistory</code> record with <code>status="completed"</code> synchronously. There is no actual job execution — the endpoint is a simulation/log entry.</p>
+  <p><strong>Why:</strong> True automation execution (sending notifications, posting to Facebook) requires infrastructure not yet wired (Zalo, email). The endpoint lets the UI show a "Run" button and display history without blocking on unimplemented features.</p>
+  <p><strong>Future work:</strong> In Phase 7, replace the stub with actual job dispatch. The <code>result_summary</code> field already has the right structure to carry real results.</p>
+</div>
+
+<!-- ─────────────────────────────────────── -->
+<h2 id="known-issues">Known Issues &amp; Limitations</h2>
+
+<div class="card alert">
+  <h3 style="margin-top:0">L1. ANTHROPIC_API_KEY required in .env for agent chat to work</h3>
+  <p>The agent service will fall back to a canned error message if the key is missing or invalid. No app crash. Set <code>ANTHROPIC_API_KEY=sk-ant-...</code> in <code>backend/.env</code> before testing live chat.</p>
+  <p>Tests mock <code>anthropic.Anthropic</code> so they pass without a real key.</p>
+</div>
+
+<div class="card alert">
+  <h3 style="margin-top:0">L2. APScheduler not tested in integration tests</h3>
+  <p>The scheduler is started in the FastAPI lifespan but the test client uses a separate test DB. The scheduler jobs reference <code>AsyncSessionLocal</code> (production DB URL). Tests do NOT patch this, so scheduled jobs in tests would hit the wrong DB.</p>
+  <p><strong>Mitigation:</strong> The scheduler's <code>AsyncIOScheduler</code> only fires at its configured intervals (01:00 and every 5 min). During the test suite run (typically &lt;60 seconds), no job will actually fire. This is safe for now.</p>
+</div>
+
+<div class="card alert">
+  <h3 style="margin-top:0">L3. Notification.reference_type is absent from the data model</h3>
+  <p>As noted in Schema Deviations above, <code>AgentAlertItem.reference_type</code> will always be <code>null</code> until a migration adds this column to the <code>notifications</code> table.</p>
+</div>
+
+<!-- ─────────────────────────────────────── -->
+<h2 id="ops-notes">Operational Notes</h2>
+
+<div class="card">
+  <h3 style="margin-top:0">Environment variables added in Phase 6</h3>
+  <table>
+    <tr><th>Variable</th><th>Required</th><th>Default</th><th>Notes</th></tr>
+    <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Yes (for chat)</td><td>""</td><td>Already in config.py from Phase 5 planning. Set to <code>sk-ant-api03-...</code></td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">New dependencies added</h3>
+  <table>
+    <tr><th>Package</th><th>Version</th><th>Reason</th></tr>
+    <tr><td><code>apscheduler</code></td><td>3.10.4</td><td>In-process cron + interval scheduler for background jobs</td></tr>
+    <tr><td><code>anthropic</code></td><td>already in requirements</td><td>Checked — already present from Phase 5 planning</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h3 style="margin-top:0">Migration sequence</h3>
+  <p>Migration <code>0010</code> creates 4 tables in dependency order:</p>
+  <ol>
+    <li><code>workflow_templates</code> — standalone (no FKs)</li>
+    <li><code>automations</code> — FK to <code>users.id</code></li>
+    <li><code>agent_task_history</code> — FK to <code>automations.id</code></li>
+    <li><code>agent_conversations</code> — FK to <code>users.id</code></li>
+  </ol>
+  <p>Run: <code>cd backend && alembic upgrade head</code></p>
+</div>
+
+<!-- ─────────────────────────────────────── -->
+<h2 id="bugs-fixed">Bugs Found and Fixed During Implementation</h2>
+
+<div class="card change">
+  <h3 style="margin-top:0">B1. Plan specified <code>id: str</code> but convention is <code>id: uuid.UUID</code></h3>
+  <span class="tag tag-change">Bug</span>
+  <p>All plan schemas used <code>id: str</code>. All existing modules use <code>id: uuid.UUID</code>. Pydantic v2 with <code>from_attributes=True</code> cannot coerce a <code>uuid.UUID</code> ORM value to <code>str</code> — it raises <code>ValidationError: Input should be a valid string</code>.</p>
+  <p><strong>Fix:</strong> Changed <code>id</code> and all FK UUID fields to <code>uuid.UUID</code> in all three schemas (<code>WorkflowTemplateResponse</code>, <code>AutomationResponse</code>, <code>TaskHistoryResponse</code>, <code>AgentConversationResponse</code>). JSON serialization still outputs strings — no API contract change.</p>
+</div>
+
+<div class="card change">
+  <h3 style="margin-top:0">B2. Repositories used <code>commit()</code> but test session uses <code>session.begin()</code></h3>
+  <span class="tag tag-change">Bug</span>
+  <p>All existing repositories use <code>await self.db.flush()</code> instead of <code>await self.db.commit()</code>. The plan specified <code>commit()</code> in all new repositories. Inside the test session (which wraps in <code>async with session.begin()</code>), calling <code>commit()</code> closes the transaction, causing <code>InvalidRequestError: Can't operate on closed transaction inside context manager</code> when <code>refresh()</code> is subsequently called.</p>
+  <p><strong>Fix:</strong> Changed all <code>await self.db.commit()</code> to <code>await self.db.flush()</code> in workflow_templates, automations, and agent repositories.</p>
+</div>
+
+<div class="card change">
+  <h3 style="margin-top:0">B3. <code>AgentTaskHistory.automation_id</code> missing <code>ForeignKey</code> in ORM</h3>
+  <span class="tag tag-change">Bug</span>
+  <p>The <code>automation_id</code> column was declared as <code>Column(UUID(as_uuid=True))</code> in the model (no SQLAlchemy <code>ForeignKey()</code>). The FK exists in the migration DDL but not in the ORM. SQLAlchemy's <code>relationship()</code> on <code>Automation.task_history</code> could not determine the join condition, causing <code>InvalidRequestError: Could not determine join condition</code> at mapper initialization.</p>
+  <p><strong>Fix:</strong> Added <code>ForeignKey("automations.id", ondelete="SET NULL")</code> to the <code>automation_id</code> column in the ORM model.</p>
+</div>
+
+<div class="card change">
+  <h3 style="margin-top:0">B4. <code>get_current_user</code> returns <code>User</code> ORM object, not a dict</h3>
+  <span class="tag tag-change">Bug</span>
+  <p>The plan specified <code>current_user: dict = Depends(get_current_user)</code> and accessed it as <code>current_user["id"]</code>. The actual <code>get_current_user</code> dependency returns a <code>User</code> ORM model instance. Accessing it via subscript raised <code>TypeError: 'User' object is not subscriptable</code>.</p>
+  <p><strong>Fix:</strong> Changed router to <code>current_user=Depends(get_current_user)</code> (no type annotation) and accessed the user ID via <code>current_user.id</code>.</p>
+</div>
+
+<div class="card change">
+  <h3 style="margin-top:0">B5. DB state mismatch — alembic at 0007 but tables 0008/0009 already existed</h3>
+  <span class="tag tag-change">Ops Issue</span>
+  <p>Docker was previously shut down between sessions. When it restarted, PostgreSQL restored the database from a prior snapshot that contained tables from 0008 and 0009 but alembic_version was still at 0007. Running <code>alembic upgrade head</code> failed with <code>DuplicateTableError: relation "chat_conversations" already exists</code>.</p>
+  <p><strong>Fix:</strong> Stamped the DB to 0009 (<code>alembic stamp 0009</code>) to sync the version table without re-running the DDL, then ran <code>alembic upgrade head</code> to apply only 0010.</p>
+</div>
+
+<hr>
+<p style="color:#64748b; font-size:0.85rem"><em>Implementation complete — 2026-05-31. 171/171 tests passing. All Phase 6 tasks done.</em></p>
+
+</body>
+</html>

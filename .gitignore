@@ -11,4 +11,3 @@ dist/
 *.egg-info/
 .venv/
 venv/
-docs

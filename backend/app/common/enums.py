@@ -77,3 +77,52 @@ class LeadStatus(str, Enum):
     QUAN_TAM_CAO = "Quan tâm cao"
     DA_CHOT = "Đã chốt"
     KHONG_QUAN_TAM = "Không quan tâm"
+
+
+class AutomationStatus(str, Enum):
+    ACTIVE = "active"
+    PAUSED = "paused"
+    ERROR = "error"
+    DRAFT = "draft"
+
+
+class AutomationTriggerType(str, Enum):
+    SCHEDULE = "schedule"
+    EVENT = "event"
+    CONDITION = "condition"
+
+
+class AutomationFrequency(str, Enum):
+    DAILY = "daily"
+    WEEKLY = "weekly"
+    MONTHLY = "monthly"
+    CUSTOM = "custom"
+
+
+class AutomationModule(str, Enum):
+    ROOMS = "rooms"
+    CONTRACTS = "contracts"
+    TENANTS = "tenants"
+    EXPENSES = "expenses"
+    REPORTS = "reports"
+    POSTS = "posts"
+    GENERAL = "general"
+
+
+class TaskHistoryStatus(str, Enum):
+    COMPLETED = "completed"
+    RUNNING = "running"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
+class NotifyChannel(str, Enum):
+    IN_APP = "in_app"
+    EMAIL = "email"
+    SMS = "sms"
+    ZALO = "zalo"
+
+
+class AgentMessageRole(str, Enum):
+    USER = "user"
+    ASSISTANT = "assistant"

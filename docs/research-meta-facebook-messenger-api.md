@@ -518,16 +518,16 @@ Since `FACEBOOK_WEBHOOK_ENABLED=false` disables webhook processing:
 
 These must be confirmed before implementation begins:
 
-| # | Question | Impact |
-|---|---|---|
-| 1 | Does the owner already have a Meta Developer App and Facebook Page configured? | Determines if setup steps are needed or just integration |
-| 2 | Will app review be submitted before launch, or is this initially internal-only? | Affects whether public testing is blocked |
-| 3 | Should the backend support multiple Facebook Pages (multiple `page_id` values)? | If yes, Page Access Token must be looked up per `page_id` in a config table, not a single env var |
-| 4 | Should inbound messages trigger in-app notifications (the existing `notifications` module)? | If yes, `NotificationsService` must be called from the webhook processor |
-| 5 | What is the desired behavior when the 24-hour window has expired — hard reject or allow with `HUMAN_AGENT` tag? | Determines the send endpoint response for expired windows |
-| 6 | Should outbound messages be retried automatically on failure, or is manual retry via the frontend sufficient? | Affects whether a task queue (ARQ/Celery) is needed in Phase 4 |
-| 7 | Is customer name/avatar to be fetched from Meta User Profile API on first contact, or left blank until the admin fills it in? | Requires `pages_user_gender` scope and additional API call on new conversation |
-| 8 | Should conversations created manually (no PSID) be allowed to send via Meta? | If yes, admin must enter a PSID manually, which is unusual UX |
+| # | Question | Impact | Answer
+|---|---|---|---|
+| 1 | Does the owner already have a Meta Developer App and Facebook Page configured? | Determines if setup steps are needed or just integration | No I don't have |
+| 2 | Will app review be submitted before launch, or is this initially internal-only? | Affects whether public testing is blocked | It is initially internal-only |
+| 3 | Should the backend support multiple Facebook Pages (multiple `page_id` values)? | If yes, Page Access Token must be looked up per `page_id` in a config table, not a single env var | In first need implement one page per 1 tenant, in the future must update to multiple pages |
+ | 4 | Should inbound messages trigger in-app notifications (the existing `notifications` module)? | If yes, `NotificationsService` must be called from the webhook processor | Yes, it should trigger app noti
+| 5 | What is the desired behavior when the 24-hour window has expired — hard reject or allow with `HUMAN_AGENT` tag? | Determines the send endpoint response for expired windows | allow with HUMAN_AGENT |
+| 6 | Should outbound messages be retried automatically on failure, or is manual retry via the frontend sufficient? | Affects whether a task queue (ARQ/Celery) is needed in Phase 4 | automatically |
+| 7 | Is customer name/avatar to be fetched from Meta User Profile API on first contact, or left blank until the admin fills it in? | Requires `pages_user_gender` scope and additional API call on new conversation | Left it blank or gen system image with First character of customer name |
+| 8 | Should conversations created manually (no PSID) be allowed to send via Meta? | If yes, admin must enter a PSID manually, which is unusual UX | No, only reply the conversations from fan page dont need create chat manually
 
 ---
 
